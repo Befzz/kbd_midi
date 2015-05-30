@@ -9,8 +9,13 @@
 
 1a. Run it with capability for WinXP ("prev. windows")
 
+2. From folder Release:
+usbhid.exe
+midi_pc101.txt
+
 //for test
 3. Install Pianoteq Trial version ( https://www.pianoteq.com/try )
+3a. Run 32bit version!
 
 CONTROLS::
 
