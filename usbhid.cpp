@@ -51,6 +51,10 @@ int octave_shift = 2;
 HANDLE hKbd_handles[KBD_MAX]={NULL,};
 char cKbd_count = 0;
 
+
+HWND hLabel;
+HWND hComboBox;
+
 void MoveCursor( short x, short y);
 
 int get_kbd_index(HANDLE hDevice){
@@ -416,10 +420,14 @@ void CALLBACK HandleWinEvent(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG id
     }
 }
 
-
+/*
+	get midi YOKE and loopbe midi device numbers
+	+ add it to combobox
+*/
 int get_midi_yoke_num() {
 	int midi_out_devs = midiOutGetNumDevs();
 	int midi_yoke_1_devnum = -1;
+	int loopbe_devnum = -1;
 	printf("Midi Out Devices: %i\n", midi_out_devs);
 	if(midi_out_devs == 0) {
 		printf("error: no output midi devices found.(install midi-YOKE!)");
@@ -431,12 +439,26 @@ int get_midi_yoke_num() {
 		ZeroMemory(&dev_caps, sizeof(dev_caps));
 		midiOutGetDevCaps(i, &dev_caps, sizeof(dev_caps));
 		printf("%i: %ws\n", i, dev_caps.szPname);
+		
+		SendMessage(hComboBox,(UINT) CB_ADDSTRING,(WPARAM) 0,(LPARAM) dev_caps.szPname); 
+
 		if( wcscmp(dev_caps.szPname, TEXT("Out To MIDI Yoke:  1")) == 0) {
 			midi_yoke_1_devnum = i;
 			printf("DEBUG: midi-YOKE found!\n");
 		}
+		if( wcscmp(dev_caps.szPname, TEXT("LoopBe Internal MIDI")) == 0 ) {
+			loopbe_devnum = i;
+			printf("DEBUG: loopbe found!\n");
+		}
 	}
-	return midi_yoke_1_devnum;
+	if(loopbe_devnum != -1) {
+		SendMessage(hComboBox, CB_SETCURSEL, (WPARAM)loopbe_devnum, (LPARAM)0);
+		return loopbe_devnum;
+	} else if(midi_yoke_1_devnum != -1) {
+		SendMessage(hComboBox, CB_SETCURSEL, (WPARAM)midi_yoke_1_devnum, (LPARAM)0);
+		return midi_yoke_1_devnum;
+	}
+	return -1;
 }
 
 void init_midi()
@@ -464,19 +486,6 @@ void init_midi()
 		ExitProcess(0);
 	}
 
-	//find midi-YOKE 1 device by name
-	int midi_yoke_num = get_midi_yoke_num();
-	if(midi_yoke_num == -1) {
-			exit(1);
-	}
-	LoadKeyMap("midi_pc101.txt");
-
-	ResumeThread( hThreadUpdate );
-
-	if( midiOutOpen(&midiHandle, (UINT)midi_yoke_num, 0, 0, CALLBACK_NULL) != 0 ) {
-		printf("ERROR opening midi device.");
-		exit(1);
-	}
 }
 void free_midi() {
 	printf("Midi: Exiting gracefully.\n");
@@ -530,6 +539,55 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         case WM_DESTROY:
             PostQuitMessage(0);
         break;
+		case WM_CREATE: {
+			HINSTANCE hInstance = GetModuleHandle(NULL);
+			 // Adding a Label.
+			hLabel = CreateWindowExW(WS_EX_CLIENTEDGE
+				, L"STATIC", NULL
+				, WS_CHILD | WS_VISIBLE | SS_SIMPLE
+				, 7, 7, 260, 30
+				, hwnd, NULL, hInstance, NULL);
+
+			SetWindowTextW(hLabel, L"Select MIDI output:");
+
+			hComboBox = CreateWindowExW( WS_EX_CLIENTEDGE
+				, L"COMBOBOX", NULL
+				, CBS_DROPDOWN | WS_CHILD | WS_VISIBLE
+				, 7, 35, 260, 350
+				, hwnd, NULL, hInstance, NULL);
+			
+			//find midi-YOKE 1 device by name
+			int midi_yoke_num = get_midi_yoke_num();
+
+			LoadKeyMap("midi_pc101.txt");
+
+			ResumeThread( hThreadUpdate );
+
+			if( midiOutOpen(&midiHandle, (UINT)midi_yoke_num, 0, 0, CALLBACK_NULL) != 0 ) {
+				printf("ERROR opening midi device.");
+				
+			}
+		}
+		break;
+
+		case WM_COMMAND:
+
+			if(HIWORD(wParam) == CBN_SELCHANGE)	{ 
+				int ItemIndex = SendMessage((HWND) lParam, (UINT) CB_GETCURSEL, 
+					(WPARAM) 0, (LPARAM) 0);
+				midiOutClose( midiHandle );
+				if( midiOutOpen(&midiHandle, (UINT)ItemIndex, 0, 0, CALLBACK_NULL) != 0 ) {
+					printf("ERROR opening midi device.");
+				}
+			//printf("item:%i\n", ItemIndex);
+
+/*				TCHAR  ListItem[256];
+				(TCHAR) SendMessage((HWND) lParam, (UINT) CB_GETLBTEXT, 
+					(WPARAM) ItemIndex, (LPARAM) ListItem);
+				MessageBox(hwnd, (LPCWSTR) ListItem, TEXT("Item Selected"), MB_OK);   */                     
+			}
+		break;
+
         default:
             return DefWindowProc(hwnd, msg, wParam, lParam);
     }
@@ -550,7 +608,7 @@ int main(array<System::String ^> ^args)
 	
 	if (GetRawInputDeviceList(NULL, &nDevices, sizeof(RAWINPUTDEVICELIST)) != 0)
 		{ Error();}
-	printf("USB-HID Devices: %d\n",nDevices);
+	printf("RawInputDevices: %d\n",nDevices);
 	if ((pRawInputDeviceList = (PRAWINPUTDEVICELIST)malloc(sizeof(RAWINPUTDEVICELIST) * nDevices)) == NULL)
 		{Error();}
 	if (GetRawInputDeviceList(pRawInputDeviceList, &nDevices, sizeof(RAWINPUTDEVICELIST)) == -1)
@@ -562,16 +620,19 @@ int main(array<System::String ^> ^args)
 	UINT pcbSize;
 
 	for(int i=0; i<(int)nDevices ;i++) {
-		printf("%u Dev id:%u type:%hu\n",i,pRawInputDeviceList[i].hDevice, pRawInputDeviceList[i].dwType);
-		GetRawInputDeviceInfo(pRawInputDeviceList[i].hDevice, RIDI_DEVICENAME, 0, &pcbSize);
-		//printf("size:%u\n",pcbSize);
-		pData = (int*)malloc((int)pcbSize*2);
-		GetRawInputDeviceInfo(pRawInputDeviceList[i].hDevice, RIDI_DEVICENAME, (LPVOID)pData, &pcbSize);
+		//keyboard
+		if(pRawInputDeviceList[i].dwType == 1) {
+			printf("%u Dev id:%u type:%hu\n",i,pRawInputDeviceList[i].hDevice, pRawInputDeviceList[i].dwType);
+			GetRawInputDeviceInfo(pRawInputDeviceList[i].hDevice, RIDI_DEVICENAME, 0, &pcbSize);
+			//printf("size:%u\n",pcbSize);
+			pData = (int*)malloc((int)pcbSize*2);
+			GetRawInputDeviceInfo(pRawInputDeviceList[i].hDevice, RIDI_DEVICENAME, (LPVOID)pData, &pcbSize);
 
-		std::wcout << (wchar_t*)pData <<std::endl;
+			std::wcout << (wchar_t*)pData <<std::endl;
 
-		free(pData);
-
+			free(pData);
+		
+		}
 	}
 	
 	free(pRawInputDeviceList);
@@ -605,9 +666,9 @@ int main(array<System::String ^> ^args)
     hwnd = CreateWindowEx(
         NULL,
         L"myWindowClass",
-        L"Focus Me and press keys...",
+        L"kbd_midi v 0.01a",
         WS_OVERLAPPED | WS_SYSMENU | WS_SIZEBOX,
-        0, 500, 300, 100,
+        0, 500, 300, 150,
          HWND_DESKTOP, NULL, NULL, NULL); //HWND_MESSAGE
 	
     if(hwnd == NULL)
@@ -625,10 +686,10 @@ int main(array<System::String ^> ^args)
         
 	Rid[0].usUsagePage = 0x01; 
 	Rid[0].usUsage = 0x06; //keyboard
-	Rid[0].dwFlags = RIDEV_NOLEGACY;
-	Rid[0].hwndTarget = 0;
+	Rid[0].dwFlags = RIDEV_NOLEGACY | RIDEV_INPUTSINK ;
+	Rid[0].hwndTarget = hwnd;
 
-	if (RegisterRawInputDevices(Rid, 1, sizeof(Rid[0])) == FALSE) {
+	if (RegisterRawInputDevices(Rid, 1, sizeof(Rid)) == FALSE) {
 		printf("RegisterRawInputDevices FAILED.\n");
 		system("pause");
 		return 1;
