@@ -9,6 +9,7 @@
 ==================== Download ============================
 
    Release\usbhid.exe
+   Release\usbhid.cmd
    Release\midi_pc101.txt
 
    Run.

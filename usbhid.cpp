@@ -483,6 +483,7 @@ void init_midi()
 	hThreadUpdate =  CreateThread( NULL, 0, procUpdateThread, 0, CREATE_SUSPENDED, NULL);
 	if( hThreadUpdate == NULL ) {
 		printf("Can't create thread.\n");
+		system("pause");
 		ExitProcess(0);
 	}
 
@@ -495,6 +496,7 @@ void free_midi() {
 
 void Error() {
 	printf("Something BAD happens;\n");
+	system("pause");
 }
 
 
@@ -516,8 +518,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			} 
 
 			if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, lpb, &dwSize, 
-				 sizeof(RAWINPUTHEADER)) != dwSize )
+				 sizeof(RAWINPUTHEADER)) != dwSize ){
 				 OutputDebugString (TEXT("GetRawInputData does not return correct size !\n")); 
+			}
 
 			RAWINPUT* raw = (RAWINPUT*)lpb;
 			//printf("Device: %u",raw->header.hDevice);
@@ -557,15 +560,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				, hwnd, NULL, hInstance, NULL);
 			
 			//find midi-YOKE 1 device by name
-			int midi_yoke_num = get_midi_yoke_num();
+			int midi_devnum = get_midi_yoke_num();
 
+			if(midi_devnum == -1) {
+				printf("No MIDI output devices found.\n");
+				system("pause");
+				ExitProcess(0);
+			}
 			LoadKeyMap("midi_pc101.txt");
 
 			ResumeThread( hThreadUpdate );
 
-			if( midiOutOpen(&midiHandle, (UINT)midi_yoke_num, 0, 0, CALLBACK_NULL) != 0 ) {
-				printf("ERROR opening midi device.");
-				
+			if( midiOutOpen(&midiHandle, (UINT)midi_devnum, 0, 0, CALLBACK_NULL) != 0 ) {
+				printf("ERROR opening midi device.\n");
+				system("pause");
 			}
 		}
 		break;
@@ -577,7 +585,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 					(WPARAM) 0, (LPARAM) 0);
 				midiOutClose( midiHandle );
 				if( midiOutOpen(&midiHandle, (UINT)ItemIndex, 0, 0, CALLBACK_NULL) != 0 ) {
-					printf("ERROR opening midi device.");
+					printf("ERROR opening midi device.\n");
 				}
 			//printf("item:%i\n", ItemIndex);
 
@@ -706,7 +714,7 @@ int main(array<System::String ^> ^args)
 	CloseHandle( hThreadUpdate );
 	free_midi();
 	//system("pause");
-	Sleep(1000);
+	Sleep(300);
 
     return 0;
 }

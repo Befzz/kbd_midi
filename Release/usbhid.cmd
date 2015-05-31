@@ -1,0 +1,2 @@
+usbhid.exe
+pause
