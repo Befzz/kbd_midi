@@ -1,5 +1,6 @@
 ## What you need:
 
-usbhid.exe
-
-midi_pc101.txt
+```
+Release\usbhid.exe
+Release\midi_pc101.txt
+```
