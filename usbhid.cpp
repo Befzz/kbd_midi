@@ -258,7 +258,7 @@ void CheckKeyboardProc( HANDLE hDevice, int scan_code , bool bUp ) {
 			}
 		}
 	}
-	if( scan_code == 57 ) {
+	if( scan_code == 57 ) { /* SPACEBAR */
 		if( bUp) {
 			midi_send_controller(64, 127);
 			MoveCursor( INFO_SUSTAIN_OFFSET_X , -1);
@@ -289,12 +289,12 @@ void CheckKeyboardProc( HANDLE hDevice, int scan_code , bool bUp ) {
 	}
 		
 	if( ( scan_code == 1 || scan_code == 66) && bUp ) { /*ESC or F8*/
-		PostQuitMessage(0);
+		//PostQuitMessage(0);
 	}
 		
 	if( scan_code == 67 && !bUp ) { /*F9*/
 
-		int random_note = get_random_int(24,24+24);
+		int random_note = get_random_int(24,24+24+24+24);
 
 		//printf("%i\n", random_note );
 		div_t divresult = div(random_note, 12);
@@ -302,13 +302,13 @@ void CheckKeyboardProc( HANDLE hDevice, int scan_code , bool bUp ) {
 
 		printf("%s%i\n",&str_notes[(random_note % 12)*3], octave);
 
-		midi_send_note( get_random_int(30,90), random_note, TRUE);
+		midi_send_note( get_random_int(10,127), random_note, TRUE);
 		midi_send_note( 0,random_note, FALSE);
 		//print_key_info(random_note, 0);
 		//MoveCursor( 0 , 1);
 	}
 	
-	if(scan_code == 59 && bUp) {
+	if(scan_code == 59 && bUp) { /* F1 */
 		g_bDebug_keys = !g_bDebug_keys;
 		printf("Debug key scan_codes %s",(g_bDebug_keys?"enabled.\n":"disabled.\n"));
 	}
